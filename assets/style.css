@@ -184,6 +184,11 @@ div[data-testid="stVerticalBlock"]>div[data-testid="stVerticalBlock"] {
     padding: 15px !important;
 }
 
+[data-testid='stFileUploader']>div {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
 [data-testid='stFileUploader'] small {
     display: none;
 }
