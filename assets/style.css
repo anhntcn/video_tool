@@ -182,7 +182,6 @@ div[data-testid="stVerticalBlock"]>div[data-testid="stVerticalBlock"] {
     background-color: var(--secondary-background-color) !important;
     border: 1px solid var(--border-color) !important;
     border-radius: 6px !important;
-    padding: 4px 8px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
@@ -233,6 +232,11 @@ div[data-testid="stVerticalBlock"]>div[data-testid="stVerticalBlock"] {
 
 [data-testid='stFileUploader'] section>div {
     padding: 15px !important;
+}
+
+[data-testid='stFileUploader']>div {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
 }
 
 /* Ẩn dòng text 'Limit 200MB...' cho gọn nếu cần */
