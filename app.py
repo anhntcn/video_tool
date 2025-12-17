@@ -331,7 +331,7 @@ def display_results_fragment():
 
                     # Info
                     name = item["name"]
-                    short_name = (name[:40] + "...") if len(name) > 40 else name
+                    short_name = (name[:30] + "...") if len(name) > 30 else name
                     st.markdown(f"**{short_name}**", help=name)
                     st.caption(item["size"])
 
