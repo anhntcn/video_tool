@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
+from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
@@ -36,7 +37,7 @@ if "processing_thread" not in st.session_state:
 
 # --- CORE FUNCTIONS (CHẠY TRONG THREAD) ---
 def process_video_task(
-    input_path, output_path, thumb_path, platform, speed, options, queue_obj, stop_event
+    input_path, output_path, platform, speed, options, queue_obj, stop_event
 ):
     """Hàm xử lý chạy trong thread riêng với các hiệu ứng nâng cao"""
 
@@ -61,6 +62,13 @@ def process_video_task(
         filters.append("hflip")
 
     # c. Advanced Visual Options
+    # Rotation (Mới) - Đặt trước Crop để tránh bị đen góc nếu combine
+    rotate_angle = options.get("rotate", 0)
+    if rotate_angle != 0:
+        # Xoay và lấp đầy nền đen (tuy nhiên nếu có crop sau đó thì sẽ cắt hết đen)
+        # Sử dụng ow, oh mặc định sẽ giữ nguyên kích thước khung hình nhưng bị đen góc
+        # PI = 3.141592653589793
+        filters.append(f"rotate={rotate_angle}*PI/180")
     if options.get("zoom_crop"):
         # Zoom & Crop 10%: crop=iw*0.9:ih*0.9 -> scale=iw:ih
         filters.append("crop=iw*0.9:ih*0.9")
@@ -140,22 +148,6 @@ def process_video_task(
         error_msg = str(e)
 
     # 5. Generate Thumbnail nếu thành công
-    if is_success and not stop_event.is_set():
-        thumb_cmd = [
-            "ffmpeg",
-            "-i",
-            str(output_path),
-            "-ss",
-            "00:00:01.000",
-            "-vframes",
-            "1",
-            "-y",
-            str(thumb_path),
-        ]
-        try:
-            subprocess.run(thumb_cmd, capture_output=True, check=True)
-        except Exception:
-            pass
 
     # 6. Send Result
     if not stop_event.is_set():
@@ -164,7 +156,7 @@ def process_video_task(
             "filename": input_path.name,
             "output_name": output_path.name,
             "output_path": str(output_path),
-            "thumb_path": str(thumb_path) if os.path.exists(thumb_path) else None,
+            "thumb_path": None,
             "size": f"{os.path.getsize(output_path) / (1024 * 1024):.1f} MB"
             if is_success
             else "0 MB",
@@ -176,7 +168,6 @@ def process_video_task(
 def worker_main(
     file_paths,
     output_dir,
-    thumb_dir,
     platform,
     speed,
     options,
@@ -200,12 +191,11 @@ def worker_main(
         prefix = "tiktok" if platform == "TikTok" else "shorts"
         output_filename = f"{prefix}_{filename}"
         output_path = output_dir / output_filename
-        thumb_path = thumb_dir / f"{output_filename}.jpg"
+        output_path = output_dir / output_filename
 
         process_video_task(
             input_path,
             output_path,
-            thumb_path,
             platform,
             speed,
             options,
@@ -267,6 +257,19 @@ def display_results_fragment():
                 elif msg["type"] == "complete":
                     st.session_state["is_running"] = False
                     st.toast("🎉 Đã xử lý xong toàn bộ video!", icon="✅")
+
+                    # Auto scroll to results
+                    st.markdown(
+                        """
+                        <script>
+                            var element = window.parent.document.getElementById("results_section");
+                            if (element) {
+                                element.scrollIntoView({behavior: "smooth", block: "start"});
+                            }
+                        </script>
+                        """,
+                        unsafe_allow_html=True,
+                    )
                     # KHÔNG gọi st.rerun() ở đây để tránh tắt popup
         except queue.Empty:
             pass
@@ -301,18 +304,21 @@ def display_results_fragment():
     if not os.path.exists(f"{zip_base}.zip"):
         create_zip_archive(first_path.parent, str(zip_base))
 
+    zip_name = f"{datetime.now().strftime('%y%m%d_%H%M%S')}_{len(results)}_videos.zip"
     with open(f"{zip_base}.zip", "rb") as f_zip:
         st.download_button(
             label=f"📦 Tải tất cả ({len(results)} videos)",
             data=f_zip.read(),
-            file_name="processed_videos.zip",
+            file_name=zip_name,
             mime="application/zip",
             type="primary",
             key=f"dl_all_{len(results)}",
         )
 
     # Grid Render
-    cols_per_row = 6
+    # Grid Render
+    # Mobile: cols=2 (Streamlit auto stacks), Desktop: cols=3 or 5 để khung video đủ lớn
+    cols_per_row = 5
     rows = [results[i : i + cols_per_row] for i in range(0, len(results), cols_per_row)]
 
     for row_idx, row in enumerate(rows):
@@ -320,36 +326,25 @@ def display_results_fragment():
         for idx, item in enumerate(row):
             with cols[idx]:
                 with st.container(border=True):
-                    # Thumb
-                    if item["thumb"]:
-                        st.image(item["thumb"], use_container_width=True)
-                    else:
-                        st.write("No Image")
+                    # Video Player
+                    st.video(item["path"])
 
                     # Info
                     name = item["name"]
-                    short_name = (name[:20] + "..") if len(name) > 20 else name
+                    short_name = (name[:40] + "...") if len(name) > 40 else name
                     st.markdown(f"**{short_name}**", help=name)
                     st.caption(item["size"])
 
-                    # Buttons
+                    # Download Button only
                     suffix = f"{row_idx}_{idx}"
-                    b1, b2 = st.columns(2)
-                    with b1:
-                        # Key phải unique để tránh xung đột
-                        if st.button(
-                            "👁️", key=f"v_{suffix}_{name}", use_container_width=True
-                        ):
-                            preview_modal(item["path"], item["name"])
-                    with b2:
-                        with open(item["path"], "rb") as f:
-                            st.download_button(
-                                "⬇️",
-                                f,
-                                file_name=name,
-                                key=f"d_{suffix}_{name}",
-                                use_container_width=True,
-                            )
+                    with open(item["path"], "rb") as f:
+                        st.download_button(
+                            "⬇️ Tải xuống",
+                            f,
+                            file_name=name,
+                            key=f"d_{suffix}_{name}",
+                            use_container_width=True,
+                        )
 
 
 # --- MAIN APP ---
@@ -419,6 +414,16 @@ def main():
             help="Làm tối dần 4 góc video. Thay đổi biểu đồ ánh sáng (Histogram) của video để khác biệt so với gốc.",
         )
 
+        opt_rotate = st.slider(
+            "Xoay nghiêng (Độ)",
+            -5,
+            5,
+            0,
+            1,
+            disabled=is_disabled,
+            help="Xoay video một góc nhỏ (-5 đến 5 độ). Rất hiệu quả để tránh khớp khung hình (Visual Match). Nên dùng kèm Zoom & Crop để tránh viền đen.",
+        )
+
         # C. Audio Options
         st.subheader("3. Âm thanh (Audio)")
         opt_pitch = st.checkbox(
@@ -481,6 +486,7 @@ def main():
                 "mute_audio": opt_mute,
                 "pitch_shift": opt_pitch,
                 "low_bass": opt_bass,
+                "rotate": opt_rotate,
             }
 
             st.session_state["processed_results"] = []
@@ -498,7 +504,6 @@ def main():
             temp_path = Path(temp_obj.name)
             (temp_path / "input").mkdir()
             (temp_path / "output").mkdir()
-            (temp_path / "thumbnails").mkdir()
 
             # Save Inputs
             file_paths = []
@@ -514,7 +519,6 @@ def main():
                 args=(
                     file_paths,
                     temp_path / "output",
-                    temp_path / "thumbnails",
                     platform,
                     speed,
                     options,
@@ -531,8 +535,29 @@ def main():
             st.session_state["is_running"] = False
             st.rerun()
     # Results Layout
-    if st.session_state["processed_results"] or st.session_state["is_running"]:
-        display_results_fragment()
+    # Create a column for results to place the anchor
+    col_result = st.container()
+    with col_result:
+        # Anchor for scrolling
+        st.markdown('<div id="results_section"></div>', unsafe_allow_html=True)
+        if st.session_state["processed_results"] or st.session_state["is_running"]:
+            display_results_fragment()
+            # Inject JavaScript to scroll to the results section when processing is complete
+            if (
+                st.session_state["processed_results"]
+                and not st.session_state["is_running"]
+            ):
+                st.markdown(
+                    """
+                    <script>
+                        var element = document.getElementById('results_section');
+                        if (element) {
+                            element.scrollIntoView({behavior: 'smooth'});
+                        }
+                    </script>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
 
 if __name__ == "__main__":

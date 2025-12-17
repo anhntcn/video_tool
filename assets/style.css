@@ -22,34 +22,24 @@ section[data-testid="stSidebar"] h3 {
     padding-bottom: 0.5rem !important;
 }
 
-/* 2. Tùy chỉnh Popup Video */
+/* 2. Tùy chỉnh Popup Video (nếu còn dùng) */
 div[data-testid="stDialog"] div[data-testid="stMetadata"] {
     display: none;
 }
 
-/* Dialog container: Max size screen limits, Auto size to fit content */
 div[role="dialog"][data-testid="stDialog"] {
     width: fit-content !important;
     max-width: 95vw !important;
     max-height: 95vh !important;
     margin: auto !important;
-    /* Center on screen */
     overflow: hidden !important;
-    /* Prevent scroll */
 }
 
-/* Video: Constrained by Viewport, fills container */
 div[data-testid="stDialog"] video {
-    /* Logic: Video tựtính toán kích thước dựa trên giới hạn Viewport */
-    /* Quy tắc: Max width 90vw HOẶC Max height 85vh --> Cái nào đến trước thì dừng lại */
     max-width: 90vw !important;
     max-height: 85vh !important;
-
-    /* Auto scale theo tỷ lệ */
     width: auto !important;
     height: auto !important;
-
-    /* Căn giữa */
     display: block;
     margin: 0 auto;
     object-fit: contain;
@@ -57,43 +47,60 @@ div[data-testid="stDialog"] video {
 
 /* 3. Tùy chỉnh Grid Item Result (Custom Card) */
 
-/* Nhắm vào Container có border=True bên trong Grid */
 div[data-testid="stVerticalBlockBorderWrapper"] {
     border: 1px solid #e0e0e0 !important;
-    /* Border màu nhẹ */
     border-radius: 8px !important;
     padding: 0px !important;
-    /* Xóa padding mặc định để ảnh tràn viền */
     background-color: #ffffff;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     overflow: hidden;
-    /* Cắt góc ảnh */
+    height: 100%;
+    /* Đảm bảo card fill chiều cao của cột */
+    display: flex;
+    flex-direction: column;
 }
 
 div[data-testid="stVerticalBlockBorderWrapper"]:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     border-color: #ff4b4b !important;
-    /* Highlight màu đỏ Streamlit */
 }
 
-/* Phần nội dung bên trong Card (Padding cho text/button) */
+/* Phần nội dung bên trong Card */
 div[data-testid="stVerticalBlockBorderWrapper"]>div {
     padding: 0.5rem !important;
+    flex: 1;
+    /* Cho phép nội dung dãn */
+    display: flex;
+    flex-direction: column;
 }
 
-/* Thumbnail Image Adjustment */
-div[data-testid="stImage"] {
-    margin-bottom: 0.5rem !important;
-}
-
-div[data-testid="stImage"] img {
-    border-radius: 4px;
-    object-fit: cover;
-    aspect-ratio: 9/16;
-    /* Tỷ lệ dọc cho TikTok/Shorts */
+/* --- FORCE 9:16 VIDEO FRAME --- */
+/* Target container của video nằm trong Border Wrapper */
+/* Sử dụng kỹ thuật padding-hack để ép tỷ lệ khung hình */
+div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVideo"] {
+    position: relative !important;
     width: 100% !important;
+    height: 0 !important;
+    padding-bottom: 177.77% !important;
+    /* 16/9 = 1.7777 -> 177.77% height relative to width */
+    background-color: #000;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+    /* Cách phần text bên dưới */
+}
+
+/* Video bên trong sẽ tuyệt đối theo khung trên */
+div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVideo"] video {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+    /* Video nằm gọn trong khung, không méo, có viền đen nếu khác tỷ lệ */
 }
 
 /* Text Styling */
@@ -106,19 +113,17 @@ div[data-testid="stMarkdown"] p {
     text-overflow: ellipsis;
 }
 
-/* Caption (Size) */
 div[data-testid="stCaptionContainer"] {
     font-size: 0.75rem;
     color: #666;
     margin-bottom: 0 !important;
 }
 
-/* Button Group Alignment */
+/* Button Group */
 div[data-testid="stHorizontalBlock"] {
     gap: 0.5rem !important;
 }
 
-/* Compact Grid Layout Spacing */
 div[data-testid="stVerticalBlock"]>div[data-testid="stVerticalBlock"] {
     gap: 0.5rem !important;
 }
@@ -127,17 +132,13 @@ div[data-testid="stVerticalBlock"]>div[data-testid="stVerticalBlock"] {
     display: none !important;
 }
 
-/* --- MOBILE RESPONSIVE GRID (2 Columns) --- */
+/* --- MOBILE RESPONSIVE --- */
 @media only screen and (max-width: 768px) {
-
-    /* Bắt buộc các hàng (Horizontal Block) phải wrap nội dung */
     div[data-testid="stHorizontalBlock"] {
         flex-wrap: wrap !important;
         gap: 0.5rem !important;
-        /* Khoảng cách giữa các cột/hàng */
     }
 
-    /* Ép các cột (Column) về chiều rộng ~50% để tạo thành 2 cột */
     div[data-testid="column"] {
         flex: 1 1 calc(50% - 0.5rem) !important;
         max-width: calc(50% - 0.5rem) !important;
@@ -145,8 +146,7 @@ div[data-testid="stVerticalBlock"]>div[data-testid="stVerticalBlock"] {
     }
 }
 
-/* --- FILE UPLOADER GRID LAYOUT --- */
-/* Streamlit giới hạn cứng 3 items/page nên Grid 3 cột là tối ưu nhất */
+/* --- FILE UPLOADER STYLE --- */
 [data-testid='stFileUploader'] ul {
     display: grid !important;
     grid-template-columns: repeat(3, 1fr) !important;
@@ -154,28 +154,10 @@ div[data-testid="stVerticalBlock"]>div[data-testid="stVerticalBlock"] {
     padding-top: 10px !important;
 }
 
-/* Pagination Compact Styling */
 [data-testid="stFileUploaderPagination"] {
     justify-content: center !important;
     padding: 0 !important;
     margin-top: 5px !important;
-}
-
-[data-testid="stFileUploaderPagination"] small {
-    display: block !important;
-    font-size: 0.75rem !important;
-    margin-right: 10px !important;
-}
-
-[data-testid="stFileUploaderPagination"] button {
-    min-height: 24px !important;
-    height: 24px !important;
-    padding: 0 4px !important;
-}
-
-[data-testid="stFileUploaderPagination"] svg {
-    width: 16px !important;
-    height: 16px !important;
 }
 
 [data-testid='stFileUploader'] ul li {
@@ -189,62 +171,23 @@ div[data-testid="stVerticalBlock"]>div[data-testid="stVerticalBlock"] {
     overflow: hidden !important;
 }
 
-/* Filename Text Truncation */
 [data-testid='stFileUploader'] ul li>div:first-child {
     min-width: 0 !important;
-    /* Allow flex item to shrink below content size */
     flex: 1 1 auto !important;
     display: flex !important;
     align-items: center !important;
-    overflow: hidden !important;
     border: 1px solid rgba(49, 51, 63, 0.2);
     border-radius: 6px !important;
-}
-
-[data-testid='stFileUploader'] ul li>div:first-child>div {
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    font-size: 0.85rem !important;
-    padding-left: 0 !important;
-}
-
-[data-testid='stFileUploader'] ul li>div:first-child>div button {
-    margin-right: 5px !important;
-}
-
-[data-testid='stFileUploader'] ul li>div:first-child>div [data-testid="stFileUploaderFileName"] {
-    margin-right: 0 !important;
-    margin-bottom: 0 !important;
-}
-
-/* Remove Button Consistency */
-[data-testid='stFileUploader'] ul li button {
-    flex-shrink: 0 !important;
-    /* Prevent button from vanishing */
-    margin-left: 5px !important;
-}
-
-/* Compact Dropzone Area */
-[data-testid='stFileUploader'] section {
-    padding: 1rem !important;
 }
 
 [data-testid='stFileUploader'] section>div {
     padding: 15px !important;
 }
 
-[data-testid='stFileUploader']>div {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-}
-
-/* Ẩn dòng text 'Limit 200MB...' cho gọn nếu cần */
 [data-testid='stFileUploader'] small {
     display: none;
 }
 
-/* Mobile Responsive */
 @media (max-width: 1000px) {
     [data-testid='stFileUploader'] ul {
         grid-template-columns: repeat(3, 1fr) !important;
