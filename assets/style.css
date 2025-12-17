@@ -15,7 +15,7 @@ section[data-testid="stSidebar"] .stElementContainer {
     margin-bottom: 0.5rem !important;
 }
 
-section[data-testid="stSidebar"] h1,
+h1,
 section[data-testid="stSidebar"] h2,
 section[data-testid="stSidebar"] h3 {
     padding-top: 0rem !important;
@@ -228,7 +228,7 @@ div[data-testid="stVerticalBlock"]>div[data-testid="stVerticalBlock"] {
 
 /* Compact Dropzone Area */
 [data-testid='stFileUploader'] section {
-    padding: 1rem 0 0.5rem 0 !important;
+    padding: 1rem !important;
 }
 
 [data-testid='stFileUploader'] section>div {

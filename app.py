@@ -154,7 +154,7 @@ def process_video_task(
         ]
         try:
             subprocess.run(thumb_cmd, capture_output=True, check=True)
-        except:
+        except Exception:
             pass
 
     # 6. Send Result
@@ -260,6 +260,10 @@ def display_results_fragment():
                     )
                     st.session_state["progress_info"]["current"] += 1
 
+                elif msg["type"] == "video_error":
+                    st.error(f"Lỗi xử lý {msg['filename']}: {msg['error']}")
+                    st.session_state["progress_info"]["current"] += 1
+
                 elif msg["type"] == "complete":
                     st.session_state["is_running"] = False
                     st.toast("🎉 Đã xử lý xong toàn bộ video!", icon="✅")
@@ -283,8 +287,6 @@ def display_results_fragment():
             )
         else:
             st.caption(f"✅ Hoàn tất ({total}/{total})")
-
-    st.divider()
 
     # 3. HIỂN THỊ DANH SÁCH KẾT QUẢ
     results = st.session_state["processed_results"]
@@ -310,7 +312,7 @@ def display_results_fragment():
         )
 
     # Grid Render
-    cols_per_row = 4
+    cols_per_row = 6
     rows = [results[i : i + cols_per_row] for i in range(0, len(results), cols_per_row)]
 
     for row_idx, row in enumerate(rows):
@@ -405,10 +407,10 @@ def main():
             help="Phóng to video 10% rồi cắt viền xung quanh. Giúp loại bỏ watermark ở cạnh và thay đổi cấu trúc khung hình (Anti-frame check).",
         )
         opt_noise = st.checkbox(
-            "Thêm Noise (Nhiễu hạt)",
+            "Làm nhiễu (Add Noise)",
             value=False,
             disabled=is_disabled,
-            help="Phủ một lớp hạt nhiễu mỏng lên video. Giúp thay đổi mã hóa từng pixel, chống quét trùng lặp mã Hash (Digital Fingerprint).",
+            help="Phủ một lớp nhiễu mỏng lên video. Giúp thay đổi mã hóa từng pixel, chống quét trùng lặp mã Hash (Digital Fingerprint).",
         )
         opt_vignette = st.checkbox(
             "Vignette (Tối 4 góc)",
@@ -420,7 +422,7 @@ def main():
         # C. Audio Options
         st.subheader("3. Âm thanh (Audio)")
         opt_pitch = st.checkbox(
-            "Pitch Shifting (Đổi giọng)",
+            "Đổi giọng (Pitch Shifting)",
             value=True,
             disabled=is_disabled,
             help="Tăng cao độ âm thanh (Pitch) lên 5%. Giúp giọng nói/âm nhạc khác đi so với bản gốc để tránh quét bản quyền âm thanh (Audio Match).",
@@ -457,83 +459,78 @@ def main():
             st.caption(f"✅ Đã chọn **{len(uploaded_files)}** video.")
 
     # Action Buttons
-    col_btn1, col_btn2 = st.columns([1, 4])
-    with col_btn1:
-        if not st.session_state["is_running"]:
-            if st.button(
-                "🚀 XỬ LÝ NGAY",
-                type="primary",
-                use_container_width=True,
-                disabled=not uploaded_files,
-            ):
-                # START LOGIC
-                if st.session_state["temp_obj"]:
-                    try:
-                        st.session_state["temp_obj"].cleanup()
-                    except:
-                        pass
+    if not st.session_state["is_running"]:
+        if st.button(
+            "🚀 CHẠY",
+            type="primary",
+            use_container_width=True,
+            disabled=not uploaded_files,
+        ):
+            # START LOGIC
+            if st.session_state["temp_obj"]:
+                try:
+                    st.session_state["temp_obj"].cleanup()
+                except Exception:
+                    pass
 
-                # Gom options
-                options = {
-                    "zoom_crop": opt_zoom,
-                    "add_noise": opt_noise,
-                    "vignette": opt_vignette,
-                    "mute_audio": opt_mute,
-                    "pitch_shift": opt_pitch,
-                    "low_bass": opt_bass,
-                }
+            # Gom options
+            options = {
+                "zoom_crop": opt_zoom,
+                "add_noise": opt_noise,
+                "vignette": opt_vignette,
+                "mute_audio": opt_mute,
+                "pitch_shift": opt_pitch,
+                "low_bass": opt_bass,
+            }
 
-                st.session_state["processed_results"] = []
-                st.session_state["is_running"] = True
-                st.session_state["stop_event"].clear()
-                st.session_state["progress_info"] = {
-                    "current": 0,
-                    "total": 0,
-                    "status": "Starting...",
-                }
+            st.session_state["processed_results"] = []
+            st.session_state["is_running"] = True
+            st.session_state["stop_event"].clear()
+            st.session_state["progress_info"] = {
+                "current": 0,
+                "total": 0,
+                "status": "Starting...",
+            }
 
-                # Setup Temp
-                temp_obj = tempfile.TemporaryDirectory()
-                st.session_state["temp_obj"] = temp_obj
-                temp_path = Path(temp_obj.name)
-                (temp_path / "input").mkdir()
-                (temp_path / "output").mkdir()
-                (temp_path / "thumbnails").mkdir()
+            # Setup Temp
+            temp_obj = tempfile.TemporaryDirectory()
+            st.session_state["temp_obj"] = temp_obj
+            temp_path = Path(temp_obj.name)
+            (temp_path / "input").mkdir()
+            (temp_path / "output").mkdir()
+            (temp_path / "thumbnails").mkdir()
 
-                # Save Inputs
-                file_paths = []
-                for uf in uploaded_files:
-                    p = temp_path / "input" / uf.name
-                    with open(p, "wb") as f:
-                        f.write(uf.getbuffer())
-                    file_paths.append(p)
+            # Save Inputs
+            file_paths = []
+            for uf in uploaded_files:
+                p = temp_path / "input" / uf.name
+                with open(p, "wb") as f:
+                    f.write(uf.getbuffer())
+                file_paths.append(p)
 
-                # Start Thread
-                t = threading.Thread(
-                    target=worker_main,
-                    args=(
-                        file_paths,
-                        temp_path / "output",
-                        temp_path / "thumbnails",
-                        platform,
-                        speed,
-                        options,
-                        st.session_state["result_queue"],
-                        st.session_state["stop_event"],
-                    ),
-                )
-                t.start()
-                st.session_state["processing_thread"] = t
-                st.rerun()
-        else:
-            if st.button("⏹️ DỪNG", type="secondary", use_container_width=True):
-                st.session_state["stop_event"].set()
-                st.session_state["is_running"] = False
-                st.rerun()
-
-    st.divider()
-
-    # --- 3. LIVE RESULTS ---
+            # Start Thread
+            t = threading.Thread(
+                target=worker_main,
+                args=(
+                    file_paths,
+                    temp_path / "output",
+                    temp_path / "thumbnails",
+                    platform,
+                    speed,
+                    options,
+                    st.session_state["result_queue"],
+                    st.session_state["stop_event"],
+                ),
+            )
+            t.start()
+            st.session_state["processing_thread"] = t
+            st.rerun()
+    else:
+        if st.button("⏹️ DỪNG", type="secondary", use_container_width=True):
+            st.session_state["stop_event"].set()
+            st.session_state["is_running"] = False
+            st.rerun()
+    # Results Layout
     if st.session_state["processed_results"] or st.session_state["is_running"]:
         display_results_fragment()
 
